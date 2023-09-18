@@ -1,0 +1,120 @@
+#include <EEPROM.h>
+#include "GravityTDS.h"
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include "DHT.h" 
+
+
+#define PIN_RELAY1 3//Вентилятор1   ПИНЫ!!!!!
+#define PIN_RELAY2 6//Вентилятор2
+#define PIN_RELAY3 7//Вентилятор3
+#define PIN_RELAY4 8//Вентилятор4
+#define Pump_Pin 5//Насос
+#define Light_Pin 4//Свет
+#define DHTPIN A0//Влажность и температура
+#define DHTTYPE DHT11 
+#define TdsSensorPin A1
+GravityTDS gravityTds;
+ 
+float temperature = 25,tdsValue = 0;
+//инициализация датчика
+DHT dht(DHTPIN, DHTTYPE);
+
+byte degree[8] = // кодируем символ градуса
+{
+  B00111,
+  B00101,
+  B00111,
+  B00000,
+  B00000,
+  B00000,
+  B00000,
+};
+
+LiquidCrystal_I2C lcd(0x27,16,2); // Задаем адрес и размерность дисплея
+
+void setup()
+{
+  lcd.init(); // Инициализация lcd
+  lcd.backlight(); // Включаем подсветку
+  lcd.createChar(1, degree); // Создаем символ под номером 1
+
+  pinMode(PIN_RELAY1, OUTPUT);
+  pinMode(PIN_RELAY2, OUTPUT);
+  pinMode(PIN_RELAY3, OUTPUT);
+  pinMode(PIN_RELAY4, OUTPUT);
+  pinMode(Pump_Pin, OUTPUT);
+  pinMode(Light_Pin, OUTPUT);
+
+  Serial.begin(9600);
+  dht.begin();
+
+   lcd.begin(16,2);
+    gravityTds.setPin(TdsSensorPin);
+    gravityTds.setAref(5.0);  //reference voltage on ADC, default 5.0V on Arduino UNO
+    gravityTds.setAdcRange(1024);  //1024 for 10bit ADC;4096 for 12bit ADC
+    gravityTds.begin();  //initialization
+}
+
+void loop() {
+   //temperature = readTemperature();  //add your temperature sensor and read it
+    gravityTds.setTemperature(temperature);  // set the temperature and execute temperature compensation
+    gravityTds.update();  //sample and calculate
+    tdsValue = gravityTds.getTdsValue();  // then get the value
+    Serial.print(tdsValue,0);
+    Serial.println("ppm");
+    lcd.setCursor(0, 0);
+    lcd.print("TDS Value:");
+    lcd.setCursor(0, 1);
+    lcd.print(tdsValue,0);
+    lcd.print(" PPM");
+    delay(1000);
+    lcd.clear();
+
+  // Добавляем паузы в несколько секунд между измерениями
+  delay(2000);
+
+  // Reading temperature or humidity takes about 250 milliseconds!
+  // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
+  float h = dht.readHumidity();
+  
+  // Read temperature as Celsius
+  float t = dht.readTemperature();
+  
+  // Read temperature as Fahrenheit
+  float f = dht.readTemperature(true);
+  
+  // Выводим показания влажности и температуры
+  lcd.setCursor(0, 0); // Устанавливаем курсор в начало 1 строки
+  lcd.print("Hum = % "); // Выводим текст
+  lcd.setCursor(7, 0); // Устанавливаем курсор на 7 символ
+  lcd.print(h, 1); // Выводим на экран значение влажности
+  
+  lcd.setCursor(0, 1); // Устанавливаем курсор в начало 2 строки
+  lcd.print("Temp = \1C "); // Выводим текст, \1 - значок градуса
+  lcd.setCursor(7, 1); // Устанавливаем курсор на 7 символ
+  lcd.print(t,1); // Выводим значение температуры
+  
+  if(t>27) {
+    digitalWrite(PIN_RELAY1, LOW);
+    digitalWrite(PIN_RELAY2, LOW);
+    digitalWrite(PIN_RELAY3, LOW);
+    digitalWrite(PIN_RELAY4, LOW);
+  }
+  else {
+    digitalWrite(PIN_RELAY1, HIGH);
+    digitalWrite(PIN_RELAY2, HIGH);
+    digitalWrite(PIN_RELAY3, HIGH);
+    digitalWrite(PIN_RELAY4, HIGH);
+  }
+  
+  digitalWrite(Pump_Pin, HIGH);
+  delay(1000); //
+  digitalWrite(Pump_Pin, LOW);
+  delay(1000);
+  
+  digitalWrite(Light_Pin, HIGH);
+  delay(1000);
+  digitalWrite(Light_Pin, LOW);
+  delay(1000);
+}
